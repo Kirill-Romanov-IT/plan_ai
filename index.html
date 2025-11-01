@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Планировщик задач</title>
+  <meta name="color-scheme" content="light dark">
+  <style>
+    :root{
+      --bg: #0b0e14;
+      --panel: #111625;
+      --muted: #8da1b9;
+      --text: #e6edf3;
+      --accent: #7aa2f7;
+      --ok:#22c55e;
+      --warn:#f59e0b;
+      --danger:#ef4444;
+      --border:#20283a;
+      --radius:14px;
+      --shadow: 0 8px 30px rgba(0,0,0,.35);
+    }
+    @media (prefers-color-scheme: light){
+      :root{
+        --bg:#f6f8fb; --panel:#ffffff; --muted:#6b7280; --text:#0b1220;
+        --accent:#3b82f6; --ok:#16a34a; --warn:#d97706; --danger:#dc2626;
+        --border:#e5e7eb; --shadow: 0 10px 30px rgba(0,0,0,.08);
+      }
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      display:flex; align-items:flex-start; justify-content:center; padding:32px 16px;
+    }
+    .wrap{width:100%; max-width:980px; display:grid; gap:16px}
+    header{
+      padding:16px 20px; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow);
+      display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+    }
+    h1{font-size:20px; margin:0}
+    .badge{font-size:12px; color:var(--muted)}
+    .card{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow)}
+    form{display:grid; gap:16px; padding:20px}
+    .grid{display:grid; gap:12px}
+    @media (min-width:720px){
+      .grid-2{grid-template-columns:1fr 1fr}
+    }
+    label{display:block; font-size:14px; color:var(--muted); margin-bottom:6px}
+    textarea,input[type="date"]{
+      width:100%; border:1px solid var(--border); background:transparent; color:var(--text);
+      border-radius:10px; padding:12px 14px; outline:none; transition: border-color .2s, box-shadow .2s;
+    }
+    textarea{min-height:180px; resize:vertical}
+    textarea:focus, input[type="date"]:focus{border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent)}
+    .row{display:flex; gap:12px; flex-wrap:wrap}
+    button{
+      appearance:none; border:none; border-radius:12px; padding:12px 16px; cursor:pointer; font-weight:600;
+      background:var(--accent); color:white; transition:transform .04s ease, opacity .2s ease, box-shadow .2s ease;
+      box-shadow:0 6px 18px color-mix(in oklab, var(--accent) 40%, transparent);
+    }
+    button.secondary{background:transparent; color:var(--text); border:1px solid var(--border); box-shadow:none}
+    button:active{transform:translateY(1px)}
+    .hint{font-size:13px; color:var(--muted)}
+    .alert{border-top:1px dashed var(--border); padding:12px 16px; font-size:14px}
+    .alert.ok{color:var(--ok)}
+    .alert.warn{color:var(--warn)}
+    .alert.danger{color:var(--danger)}
+    .results{padding:0 0 8px}
+    table{width:100%; border-collapse:collapse; overflow:hidden; border-radius:0 0 var(--radius) var(--radius)}
+    thead th{
+      text-align:left; font-size:13px; color:var(--muted); font-weight:600; padding:10px 12px; border-bottom:1px solid var(--border); background:color-mix(in oklab, var(--panel) 92%, black 8%);
+      position:sticky; top:0; z-index:1;
+    }
+    tbody td{padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:top}
+    tbody tr:nth-child(odd){background:color-mix(in oklab, var(--panel) 96%, black 4%)}
+    .tools{display:flex; gap:8px; padding:12px 16px}
+    .sr{position:absolute; left:-9999px}
+    .footer{font-size:12px; color:var(--muted); text-align:center; padding:8px}
+    .counter{font-size:13px; color:var(--muted); margin-left:auto}
+    .chips{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    .chip{font-size:12px; border:1px solid var(--border); color:var(--muted); padding:6px 8px; border-radius:999px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="card">
+      <div>
+        <h1>Планировщик задач</h1>
+        <div class="badge">Вставь задачи (по одной на строке), выбери даты и нажми «Сгенерировать план»</div>
+      </div>
+      <div class="chips">
+        <div class="chip">Клиентский JS</div>
+        <div class="chip">Без библиотек</div>
+        <div class="chip">Экспорт CSV</div>
+      </div>
+    </header>
+
+    <section class="card">
+      <form id="plannerForm" novalidate>
+        <div>
+          <label for="tasks">Задачи <span class="hint">(каждая с новой строки)</span></label>
+          <textarea id="tasks" placeholder="Например:
+— Подготовить бриф
+— Созвон с командой
+— Прототип интерфейса
+— Ревью требований"></textarea>
+          <div class="row" style="align-items:center; margin-top:6px">
+            <span class="hint">Пустые строки будут проигнорированы.</span>
+            <span class="counter" id="taskCounter">0 задач</span>
+          </div>
+        </div>
+
+        <div class="grid grid-2">
+          <div>
+            <label for="start">Дата начала</label>
+            <input id="start" type="date">
+          </div>
+          <div>
+            <label for="end">Дата окончания</label>
+            <input id="end" type="date">
+          </div>
+        </div>
+
+        <div class="row">
+          <button type="submit">Сгенерировать план</button>
+          <button type="button" id="clearBtn" class="secondary">Очистить</button>
+          <span class="hint">Распределение равномерно по датам (round-robin).</span>
+        </div>
+
+        <div id="message" class="alert" style="display:none"></div>
+      </form>
+    </section>
+
+    <section id="resultsCard" class="card results" style="display:none">
+      <div class="tools">
+        <strong>Сформированный план</strong>
+        <span id="stats" class="counter"></span>
+        <button type="button" id="copyBtn" class="secondary" title="Скопировать как текст">Копировать</button>
+        <button type="button" id="csvBtn" class="secondary" title="Скачать CSV">Скачать CSV</button>
+      </div>
+      <div style="overflow:auto; max-height:60vh">
+        <table id="resultsTable" aria-describedby="stats">
+          <thead>
+            <tr>
+              <th style="width:160px">Дата</th>
+              <th>Задачи</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+      <div class="footer">Подсказка: можно повторно сгенерировать план — данные обновятся ниже.</div>
+    </section>
+  </div>
+
+  <script>
+    const form = document.getElementById('plannerForm');
+    const tasksEl = document.getElementById('tasks');
+    const startEl = document.getElementById('start');
+    const endEl = document.getElementById('end');
+    const msgEl = document.getElementById('message');
+    const counterEl = document.getElementById('taskCounter');
+
+    const resultsCard = document.getElementById('resultsCard');
+    const resultsBody = document.getElementById('resultsBody');
+    const resultsTable = document.getElementById('resultsTable');
+    const statsEl = document.getElementById('stats');
+    const copyBtn = document.getElementById('copyBtn');
+    const csvBtn = document.getElementById('csvBtn');
+    const clearBtn = document.getElementById('clearBtn');
+
+    // --- helpers ---
+    const fmt = new Intl.DateTimeFormat('ru-RU', {weekday:'short', day:'2-digit', month:'2-digit', year:'numeric'});
+
+    function parseTasks(text){
+      return text
+        .split(/\r?\n/)
+        .map(s => s.replace(/^[-—•\s]+/, '').trim())
+        .filter(Boolean);
+    }
+
+    function toLocalDateOnly(d){
+      // Ensure we treat input date as local date (no timezone shift)
+      const p = d instanceof Date ? d : new Date(d);
+      return new Date(p.getFullYear(), p.getMonth(), p.getDate());
+    }
+
+    function daysBetween(a,b){
+      const ms = toLocalDateOnly(b) - toLocalDateOnly(a);
+      return Math.floor(ms / 86400000);
+    }
+
+    function rangeDates(start, end){
+      const out = [];
+      const s = toLocalDateOnly(start), e = toLocalDateOnly(end);
+      for(let d = new Date(s); d <= e; d.setDate(d.getDate()+1)){
+        out.push(new Date(d));
+      }
+      return out;
+    }
+
+    function showMessage(type, text){
+      msgEl.style.display = 'block';
+      msgEl.className = 'alert ' + (type || '');
+      msgEl.textContent = text;
+    }
+
+    function hideMessage(){
+      msgEl.style.display = 'none';
+      msgEl.textContent = '';
+    }
+
+    function distribute(tasks, dates){
+      // Round-robin: 0,1,2… -> dates[ i % dates.length ]
+      const buckets = dates.map(d => ({ date:d, items:[] }));
+      tasks.forEach((t,i) => {
+        const idx = i % buckets.length;
+        buckets[idx].items.push(t);
+      });
+      return buckets;
+    }
+
+    function updateTaskCounter(){
+      const n = parseTasks(tasksEl.value).length;
+      counterEl.textContent = n + ' ' + plural(n, ['задача','задачи','задач']);
+    }
+
+    function plural(n, forms){
+      // Russian plural rules: 1, few (2-4), many (others)
+      const mod10 = n % 10, mod100 = n % 100;
+      if (mod10 === 1 && mod100 !== 11) return forms[0];
+      if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return forms[1];
+      return forms[2];
+    }
+
+    function fillTodayDefaults(){
+      const today = new Date();
+      const iso = (d)=> d.toISOString().slice(0,10);
+      startEl.value = iso(today);
+      endEl.value = iso(today);
+      startEl.max = '9999-12-31';
+      endEl.min = startEl.value;
+    }
+
+    // --- events ---
+    tasksEl.addEventListener('input', updateTaskCounter);
+
+    startEl.addEventListener('change', ()=>{
+      if (endEl.value && endEl.value < startEl.value) {
+        endEl.value = startEl.value;
+      }
+      endEl.min = startEl.value || '';
+    });
+
+    clearBtn.addEventListener('click', ()=>{
+      tasksEl.value = '';
+      updateTaskCounter();
+      fillTodayDefaults();
+      hideMessage();
+      resultsCard.style.display = 'none';
+      resultsBody.innerHTML = '';
+      statsEl.textContent = '';
+    });
+
+    form.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      hideMessage();
+
+      const tasks = parseTasks(tasksEl.value);
+      const start = startEl.value ? toLocalDateOnly(startEl.value) : null;
+      const end = endEl.value ? toLocalDateOnly(endEl.value) : null;
+
+      if (!tasks.length){
+        showMessage('warn', 'Добавьте хотя бы одну задачу (каждая с новой строки).');
+        return;
+      }
+      if (!start || !end){
+        showMessage('warn', 'Укажите даты начала и окончания.');
+        return;
+      }
+      if (end < start){
+        showMessage('danger', 'Дата окончания не может быть раньше даты начала.');
+        return;
+      }
+
+      const dates = rangeDates(start, end);
+      if (!dates.length){
+        showMessage('warn', 'Не удалось сформировать диапазон дат.');
+        return;
+      }
+
+      const buckets = distribute(tasks, dates);
+
+      // render
+      resultsBody.innerHTML = '';
+      buckets.forEach(b=>{
+        const tr = document.createElement('tr');
+        const tdDate = document.createElement('td');
+        const tdTasks = document.createElement('td');
+
+        tdDate.textContent = fmt.format(b.date);
+        if (b.items.length){
+          const ul = document.createElement('ul');
+          ul.style.margin = '0';
+          ul.style.paddingLeft = '18px';
+          b.items.forEach(it=>{
+            const li = document.createElement('li');
+            li.textContent = it;
+            ul.appendChild(li);
+          });
+          tdTasks.appendChild(ul);
+        } else {
+          tdTasks.innerHTML = '<span class="hint">—</span>';
+        }
+
+        tr.appendChild(tdDate);
+        tr.appendChild(tdTasks);
+        resultsBody.appendChild(tr);
+      });
+
+      statsEl.textContent = `${tasks.length} ${plural(tasks.length, ['задача','задачи','задач'])} • ${dates.length} ${plural(dates.length, ['день','дня','дней'])}`;
+
+      resultsCard.style.display = 'block';
+      showMessage('ok', 'Готово! План сформирован ниже.');
+    });
+
+    copyBtn.addEventListener('click', ()=>{
+      // Build plain text plan
+      const rows = [...resultsBody.querySelectorAll('tr')].map(tr=>{
+        const tds = tr.querySelectorAll('td');
+        const date = tds[0].textContent.trim();
+        const items = [...tds[1].querySelectorAll('li')].map(li=>li.textContent.trim());
+        const body = items.length ? items.map(i=>' - '+i).join('\n') : ' - (нет задач)';
+        return `${date}\n${body}`;
+      });
+      const text = rows.join('\n\n');
+      navigator.clipboard.writeText(text).then(()=>{
+        showMessage('ok', 'План скопирован в буфер обмена.');
+      }).catch(()=>{
+        showMessage('warn', 'Не удалось скопировать. Выделите текст вручную.');
+      });
+    });
+
+    csvBtn.addEventListener('click', ()=>{
+      // CSV with columns: Date, Task
+      const lines = [['Дата','Задача']];
+      [...resultsBody.querySelectorAll('tr')].forEach(tr=>{
+        const tds = tr.querySelectorAll('td');
+        const date = tds[0].textContent.trim();
+        const items = [...tds[1].querySelectorAll('li')].map(li=>li.textContent.trim());
+        if (items.length){
+          items.forEach(it=> lines.push([date, it]));
+        } else {
+          lines.push([date, '']);
+        }
+      });
+      const csv = lines.map(r=>r.map(escapeCsv).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'plan.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    function escapeCsv(v){
+      const s = String(v ?? '');
+      if (/[",\n]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+      return s;
+    }
+
+    // init
+    fillTodayDefaults();
+    updateTaskCounter();
+  </script>
+</body>
+</html>
