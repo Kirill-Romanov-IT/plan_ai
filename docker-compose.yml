@@ -5,3 +5,4 @@ services:
     build: .
     ports:
       - "1213:5000"
+    restart: unless-stopped
